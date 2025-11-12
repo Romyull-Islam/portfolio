@@ -190,6 +190,51 @@
             height: 150px;
             object-fit: cover;
             border-radius: 5px;
+            cursor: pointer;
+            transition: opacity 0.3s;
+        }
+
+        .travel-images img:hover {
+            opacity: 0.7;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1001;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.9);
+            padding-top: 60px;
+        }
+
+        .modal-content {
+            margin: auto;
+            display: block;
+            max-width: 80vw;
+            max-height: 80vh;
+            object-fit: contain;
+        }
+
+        .close {
+            position: absolute;
+            top: 15px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: #bbb;
+            text-decoration: none;
+            cursor: pointer;
         }
 
         @media (max-width: 768px) {
@@ -332,19 +377,49 @@
         </div>
     </div>
 
+    <!-- Image Modal -->
+    <div id="imageModal" class="modal">
+        <span class="close">&times;</span>
+        <img class="modal-content" id="modalImage">
+    </div>
+
     <script>
+        const imageModal = document.getElementById('imageModal');
+        const modalImage = document.getElementById('modalImage');
+        const closeModal = document.getElementsByClassName('close')[0];
+
+        function attachImageListeners() {
+            const images = document.querySelectorAll('.travel-images img');
+            images.forEach(img => {
+                img.onclick = function() {
+                    imageModal.style.display = "block";
+                    modalImage.src = this.src;
+                };
+            });
+        }
+
+        closeModal.onclick = function() {
+            imageModal.style.display = "none";
+        };
+
+        window.onclick = function(event) {
+            if (event.target === imageModal) {
+                imageModal.style.display = "none";
+            }
+        };
+
         const urlParams = new URLSearchParams(window.location.search);
         const isEditMode = urlParams.get('edit') === 'true';
 
-        function toggleTravelForm() {
+        const toggleTravelForm = () => {
             const form = document.getElementById('travelForm');
             form.style.display = form.style.display === 'none' ? 'block' : 'none';
-        }
+        };
 
-        async function convertHeicToJpeg(file) {
+        const convertHeicToJpeg = async (file) => {
             if (!window.heic2any) {
                 console.error('heic2any library not loaded');
-                return file; // Fallback if library fails to load
+                return file;
             }
             if (file.type === 'image/heic' || file.type === 'image/heif' || file.name.toLowerCase().endsWith('.heic')) {
                 try {
@@ -352,18 +427,18 @@
                     const convertedBlob = await heic2any({
                         blob: new Blob([arrayBuffer], { type: file.type }),
                         toType: 'image/jpeg',
-                        quality: 0.92 // Adjust quality if needed
+                        quality: 0.92
                     });
                     return new File([convertedBlob], file.name.replace(/\.[^/.]+$/, '') + '.jpg', { type: 'image/jpeg' });
                 } catch (error) {
                     console.error('HEIC conversion failed:', error);
-                    return file; // Fallback to original file
+                    return file;
                 }
             }
-            return file; // Return original file if not HEIC
-        }
+            return file;
+        };
 
-        function addTravelPhotos(event) {
+        const addTravelPhotos = async (event) => {
             event.preventDefault();
             
             const title = document.getElementById('travelTitle').value;
@@ -375,39 +450,40 @@
                 const imagesDiv = document.createElement('div');
                 imagesDiv.className = 'travel-images';
                 
-                Promise.all(Array.from(photoFiles).map(file => convertHeicToJpeg(file))).then(convertedFiles => {
-                    convertedFiles.forEach(file => {
-                        const reader = new FileReader();
-                        reader.onload = function(e) {
-                            const img = document.createElement('img');
-                            img.src = e.target.result;
-                            img.alt = title;
-                            imagesDiv.appendChild(img);
-                        };
-                        reader.readAsDataURL(file);
-                    });
-
-                    travelDiv.innerHTML = `
-                        <div class="travel-item-content">
-                            <h3>${title}</h3>
-                            <p class="travel-date">Uploaded on: ${new Date().toLocaleDateString()}</p>
-                            <p><strong>Note:</strong> Upload ${Array.from(photoFiles).map(f => f.name).join(', ')} to assets/images/ and update data/travel.json</p>
-                        </div>
-                    `;
-                    travelDiv.insertBefore(imagesDiv, travelDiv.firstChild);
-                    
-                    const gallery = document.getElementById('travelGallery');
-                    gallery.insertBefore(travelDiv, gallery.firstChild);
-                }).catch(error => {
-                    console.error('Error processing files:', error);
+                const convertedFiles = await Promise.all(Array.from(photoFiles).map(convertHeicToJpeg));
+                
+                convertedFiles.forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const img = document.createElement('img');
+                        img.src = e.target.result;
+                        img.alt = title;
+                        imagesDiv.appendChild(img);
+                    };
+                    reader.readAsDataURL(file);
                 });
+
+                travelDiv.innerHTML = `
+                    <div class="travel-item-content">
+                        <h3>${title}</h3>
+                        <p class="travel-date">Uploaded on: ${new Date().toLocaleDateString()}</p>
+                        <p><strong>Note:</strong> Upload ${Array.from(photoFiles).map(f => f.name).join(', ')} to assets/images/ and update data/travel.json</p>
+                    </div>
+                `;
+                travelDiv.insertBefore(imagesDiv, travelDiv.firstChild);
+                
+                const gallery = document.getElementById('travelGallery');
+                gallery.insertBefore(travelDiv, gallery.firstChild);
+                
+                // Attach listeners to new images
+                attachImageListeners();
             }
             
             event.target.reset();
             toggleTravelForm();
-        }
+        };
 
-        async function loadTravelPhotos() {
+        const loadTravelPhotos = async () => {
             try {
                 const response = await fetch('data/travel.json');
                 const photos = await response.json();
@@ -435,12 +511,14 @@
                     travelDiv.insertBefore(imagesDiv, travelDiv.firstChild);
                     gallery.insertBefore(travelDiv, gallery.firstChild);
                 });
+                // Attach listeners after loading
+                attachImageListeners();
             } catch (error) {
                 console.error('Error loading travel photos:', error);
             }
-        }
+        };
 
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', () => {
             console.log('Travel page loaded successfully!');
             
             const travelLink = document.querySelector('a[href="travel.html"]');
@@ -455,12 +533,12 @@
             loadTravelPhotos();
         });
 
-        function toggleMenu() {
+        const toggleMenu = () => {
             const menu = document.querySelector('.nav-menu');
             const toggle = document.querySelector('.menu-toggle');
             menu.classList.toggle('active');
             toggle.classList.toggle('active');
-        }
+        };
     </script>
 </body>
 </html>
