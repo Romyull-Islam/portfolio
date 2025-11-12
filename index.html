@@ -830,51 +830,35 @@
 
             loadPublications();
 
-            // Initialize Visitor Count
-            let visitCount = localStorage.getItem('visitCount') ? parseInt(localStorage.getItem('visitCount')) : 0;
-            visitCount += 1;
-            localStorage.setItem('visitCount', visitCount);
-            document.getElementById('visitor-count').textContent = `Total Visits: ${visitCount}`;
-
             // Initialize Leaflet Map
-            const map = L.map('visitor-map').setView([20, 0], 2); // Centered on equator, zoom level 2
+            const map = L.map('visitor-map').setView([20, 0], 2);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             }).addTo(map);
 
-            // Load and Display Previous Visits
-            let visits = JSON.parse(localStorage.getItem('visits') || '[]');
-            visits.forEach(visit => {
-                L.marker([visit.lat, visit.lon]).addTo(map)
-                    .bindPopup(`${visit.city}, ${visit.country}`).openPopup();
-            });
-
-            // Get and Add New Visitor Location
-            fetch('https://ipinfo.io/json?token=3df4ed75ea1b92')
+            // Fetch visitor data from backend
+            fetch('https://your-backend-url.com/api/visit', { method: 'POST' })
                 .then(response => response.json())
                 .then(data => {
-                    const lat = data.loc.split(',')[0];
-                    const lon = data.loc.split(',')[1];
-                    const city = data.city;
-                    const country = data.country;
-                    L.marker([lat, lon]).addTo(map)
-                        .bindPopup(`${city}, ${country} - Visit ${visitCount}`).openPopup();
-                    visits.push({ lat, lon, city, country });
-                    localStorage.setItem('visits', JSON.stringify(visits));
-                    map.setView([lat, lon], 2); // Adjust zoom to show all pins
+                    document.getElementById('visitor-count').textContent = `Total Visits: ${data.totalVisits}`;
+                    
+                    // Add markers
+                    data.visits.forEach(visit => {
+                        L.marker([visit.lat, visit.lon]).addTo(map)
+                            .bindPopup(`${visit.city}, ${visit.country}`);
+                    });
+                    
+                    // Fit bounds if visits exist
+                    if (data.visits.length > 0) {
+                        const bounds = data.visits.map(v => [v.lat, v.lon]);
+                        map.fitBounds(bounds, { padding: [50, 50] });
+                    }
                 })
                 .catch(error => {
-                    console.error('Error fetching location:', error);
-                    const defaultLat = 33.937856; // Marietta, USA
-                    const defaultLon = -84.519380;
-                    L.marker([defaultLat, defaultLon]).addTo(map)
-                        .bindPopup(`Default: Marietta, USA - Visit ${visitCount}`).openPopup();
-                    visits.push({ lat: defaultLat, lon: defaultLon, city: 'Marietta', country: 'USA' });
-                    localStorage.setItem('visits', JSON.stringify(visits));
+                    console.error('Error fetching visitor data:', error);
+                    document.getElementById('visitor-count').textContent = 'Total Visits: Error';
                 });
-
-            // Note: Replace 'YOUR_IPINFO_TOKEN' with a valid token from ipinfo.io
         });
 
         function toggleMenu() {
