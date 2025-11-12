@@ -838,7 +838,7 @@
             }).addTo(map);
 
             // Fetch visitor data from backend
-            fetch('https://visitor-backend-1p7u.onrender.com', { method: 'POST' })
+            fetch('https://visitor-backend-1p7u.onrender.com/api/visit', { method: 'POST' })
                 .then(response => response.json())
                 .then(data => {
                     document.getElementById('visitor-count').textContent = `Total Visits: ${data.totalVisits}`;
